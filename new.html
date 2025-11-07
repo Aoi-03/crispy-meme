@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LogiSwift – AI Route Optimizer</title>
+  <style>
+    body {
+      font-family: "Inter", sans-serif;
+      background: #f9fafb;
+      margin: 0;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 700px;
+      background: #fff;
+      padding: 2rem;
+      border-radius: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    }
+    h1 {
+      color: #2c3e50;
+      margin-bottom: 0.5rem;
+      text-align: center;
+    }
+    p {
+      text-align: center;
+      color: #6b7280;
+      font-size: 0.95rem;
+    }
+    textarea {
+      width: 100%;
+      height: 160px;
+      resize: vertical;
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #d1d5db;
+      font-size: 14px;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      padding: 0.7rem 1.5rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    button:hover { background-color: #1d4ed8; }
+    .error { color: #dc2626; margin-top: 1rem; }
+    .results {
+      margin-top: 1.5rem;
+      border-top: 1px solid #e5e7eb;
+      padding-top: 1rem;
+    }
+    .list {
+      margin-top: 0.5rem;
+      padding-left: 1.2rem;
+    }
+    .highlight {
+      color: #059669;
+      font-weight: 600;
+    }
+    a.driver-link {
+      display: inline-block;
+      margin-top: 0.8rem;
+      background: #10b981;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      text-decoration: none;
+    }
+    a.driver-link:hover { background: #059669; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🚚 LogiSwift – AI Route Optimizer</h1>
+    <p>Paste 5–10 delivery stops (one per line), then click <strong>Optimize Route</strong>.</p>
+    <textarea id="addresses" placeholder="Example:
+123 Main St, City A
+456 Market Rd, City B
+789 Park Ave, City C
+..."></textarea>
+    <button id="optimizeBtn">Optimize Route</button>
+
+    <div id="error" class="error"></div>
+    <div id="results" class="results" style="display:none;">
+      <h3>Optimized Stop Order:</h3>
+      <ol id="optimizedList" class="list"></ol>
+      <p><strong>Original Distance:</strong> <span id="origDist"></span><br>
+      <strong>Optimized Distance:</strong> <span id="optDist"></span><br>
+      <strong>Saved:</strong> <span id="savingDist" class="highlight"></span></p>
+      <a id="driverLink" class="driver-link" target="_blank">Open in Google Maps</a>
+    </div>
+  </div>
+
+  <script>
+    const backendURL = "http://127.0.0.1:5000/optimize"; // adjust if hosted elsewhere
+
+    document.getElementById("optimizeBtn").addEventListener("click", async () => {
+      const addressesText = document.getElementById("addresses").value.trim();
+      const errorDiv = document.getElementById("error");
+      const resultsDiv = document.getElementById("results");
+      errorDiv.textContent = "";
+      resultsDiv.style.display = "none";
+
+      if (!addressesText) {
+        errorDiv.textContent = "Please enter 5–10 addresses (one per line).";
+        return;
+      }
+
+      try {
+        const response = await fetch(backendURL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ addresses_text: addressesText })
+        });
+        const data = await response.json();
+
+        if (!response.ok || !data.ok) {
+          const msg = data.error || "Unknown server error.";
+          errorDiv.textContent = "⚠ " + msg;
+          return;
+        }
+
+        // Render results
+        const optList = document.getElementById("optimizedList");
+        optList.innerHTML = "";
+        data.optimized.order.forEach((addr, i) => {
+          const li = document.createElement("li");
+          li.textContent = addr;
+          optList.appendChild(li);
+        });
+
+        document.getElementById("origDist").textContent =
+          (data.original.distance_m / 1000).toFixed(2) + " km";
+        document.getElementById("optDist").textContent =
+          (data.optimized.distance_m / 1000).toFixed(2) + " km";
+        document.getElementById("savingDist").textContent =
+          data.savings.distance_pct_saved.toFixed(1) + "% distance saved";
+        document.getElementById("driverLink").href = data.driver_link;
+
+        resultsDiv.style.display = "block";
+      } catch (err) {
+        console.error(err);
+        errorDiv.textContent = "❌ Failed to connect to backend. Is Flask running?";
+      }
+    });
+  </script>
+</body>
+</html>
